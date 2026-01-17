@@ -19,15 +19,6 @@
             max-width: 1400px;
             margin: 0 auto;
         }
-        .container.alert-active {
-            background: #ff4444 !important;
-            color: white !important;
-            animation: pulse 0.8s infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-        }
         h1 { text-align: center; margin-bottom: 20px; font-size: 2em; }
         .status-bar {
             background: #f0f0f0;
@@ -39,7 +30,6 @@
             flex-wrap: wrap;
             gap: 15px;
         }
-        .container.alert-active .status-bar { background: rgba(255,255,255,0.2); }
         .status-item { display: flex; align-items: center; gap: 10px; }
         .indicator {
             width: 14px;
@@ -61,7 +51,6 @@
             border-radius: 10px;
             margin-bottom: 20px;
         }
-        .container.alert-active .settings { background: rgba(255,255,255,0.2); }
         label {
             display: block;
             margin-bottom: 5px;
@@ -90,64 +79,6 @@
         .btn-stop:hover { background: #666; }
         .btn-test { background: #4caf50; color: white; }
         .btn-test:hover { background: #45a049; }
-        .alert-panel {
-            display: none;
-            background: rgba(255,255,255,0.2);
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-        }
-        .container.alert-active .alert-panel { display: block; }
-        .alert-header {
-            font-size: 2em;
-            font-weight: bold;
-            text-align: center;
-            margin-bottom: 20px;
-            animation: flash 0.5s infinite;
-        }
-        @keyframes flash {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-        .triggered-assets {
-            max-height: 300px;
-            overflow-y: auto;
-            background: rgba(0,0,0,0.2);
-            padding: 15px;
-            border-radius: 8px;
-        }
-        .asset-alert {
-            background: rgba(255,255,255,0.9);
-            color: #333;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            font-size: 1.1em;
-        }
-        .alert-type {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 0.85em;
-            font-weight: bold;
-        }
-        .alert-type.high { background: #ff4444; color: white; }
-        .alert-type.low { background: #ffaa00; color: white; }
-        .btn-dismiss {
-            background: #ffcc00;
-            color: #333;
-            font-size: 1.5em;
-            display: none;
-            margin-top: 20px;
-            width: 100%;
-            animation: shake 0.5s infinite;
-        }
-        .container.alert-active .btn-dismiss { display: block; }
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            25% { transform: translateX(-5px); }
-            75% { transform: translateX(5px); }
-        }
         .monitoring-table {
             background: #f9f9f9;
             padding: 20px;
@@ -156,7 +87,6 @@
             max-height: 500px;
             overflow: auto;
         }
-        .container.alert-active .monitoring-table { background: rgba(255,255,255,0.15); }
         table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
         th, td {
             padding: 8px;
@@ -169,14 +99,12 @@
             position: sticky;
             top: 0;
         }
-        .container.alert-active th { background: rgba(0,0,0,0.3); }
         .last-update {
             text-align: center;
             color: #888;
             font-size: 0.9em;
             margin-top: 15px;
         }
-        .container.alert-active .last-update { color: rgba(255,255,255,0.8); }
         .info-box {
             background: #e3f2fd;
             padding: 15px;
@@ -184,14 +112,35 @@
             margin-bottom: 20px;
             border-left: 4px solid #2196F3;
         }
+        .success-message {
+            background: #4caf50;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 20px;
+            animation: slideIn 0.5s;
+            display: none;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(-20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
     <div class="container" id="container">
         <h1>🚨 Portfolio Alert Monitor</h1>
         
+        <div class="success-message" id="successMessage">
+            ✅ MONITORING STARTED! Checking every 30 seconds...
+        </div>
+        
         <div class="info-box">
-            <strong>Alert Logic:</strong> Triggers when price goes <strong>ABOVE</strong> 🚨 High Alert OR <strong>BELOW</strong> ⚠️ Low Alert
+            <strong>Alert Logic:</strong> Triggers when price goes <strong>ABOVE</strong> 🚨 High Alert OR <strong>BELOW</strong> ⚠️ Low Alert<br>
+            <strong>Alert Behavior:</strong> A NEW WINDOW will pop up with flashing red screen + loud alarm
         </div>
         
         <div class="status-bar">
@@ -205,11 +154,6 @@
             <div class="status-item">
                 <strong>Alerts:</strong> <span id="alertCount">0</span>
             </div>
-        </div>
-
-        <div class="alert-panel">
-            <div class="alert-header">⚠️ ALERT! ALERT! ALERT! ⚠️</div>
-            <div class="triggered-assets" id="triggeredAssets"></div>
         </div>
 
         <div class="settings">
@@ -228,7 +172,6 @@
         <div style="text-align: center;">
             <button class="btn-start" onclick="startMonitoring()">Start Monitoring</button>
             <button class="btn-stop" onclick="stopMonitoring()">Stop</button>
-            <button class="btn-dismiss" onclick="dismissAlert()">🔕 DISMISS ALERT</button>
         </div>
 
         <div class="monitoring-table" id="monitoringTable" style="display:none;">
@@ -260,6 +203,7 @@
         let monitoringInterval = null;
         let triggeredAssets = [];
         let dismissedAlerts = new Set();
+        let alertWindow = null;
         let audioContext = null;
         let oscillator = null;
         let gainNode = null;
@@ -274,8 +218,21 @@
         };
         
         async function startMonitoring() {
+            // Request notification permission
+            if (Notification.permission === 'default') {
+                await Notification.requestPermission();
+            }
+            
             document.getElementById('statusIndicator').classList.add('active');
-            document.getElementById('statusText').textContent = 'Monitoring Active';
+            document.getElementById('statusText').textContent = '✅ MONITORING ACTIVE';
+            
+            // Show success message
+            const successMsg = document.getElementById('successMessage');
+            successMsg.style.display = 'block';
+            setTimeout(() => {
+                successMsg.style.display = 'none';
+            }, 5000);
+            
             dismissedAlerts.clear();
             
             await checkPrices();
@@ -291,6 +248,7 @@
             dismissedAlerts.clear();
             document.getElementById('statusIndicator').classList.remove('active');
             document.getElementById('statusText').textContent = 'Stopped';
+            document.getElementById('successMessage').style.display = 'none';
         }
         
         async function checkPrices() {
@@ -378,8 +336,6 @@
                 
                 if (triggeredAssets.length > 0) {
                     showAlert();
-                } else {
-                    hideAlert();
                 }
                 
             } catch (error) {
@@ -389,84 +345,226 @@
         }
         
         function showAlert() {
-            document.getElementById('container').classList.add('alert-active');
-            
-            const alertDiv = document.getElementById('triggeredAssets');
-            alertDiv.innerHTML = triggeredAssets.map(a => `
-                <div class="asset-alert">
-                    <strong>${a.asset}</strong><br>
-                    <span class="alert-type ${a.type.toLowerCase()}">${a.type} ALERT</span><br>
-                    Current: $${a.currentPrice.toFixed(2)} | Threshold: $${a.threshold.toFixed(2)}
-                </div>
-            `).join('');
-            
-            startAlarm();
-        }
-        
-        function hideAlert() {
-            document.getElementById('container').classList.remove('alert-active');
-            stopAlarm();
-        }
-        
-        function dismissAlert() {
-            triggeredAssets.forEach(alert => {
-                dismissedAlerts.add(alert.key);
-            });
-            
-            hideAlert();
-        }
-        
-        function testAlarm() {
-            startAlarm();
-            setTimeout(() => stopAlarm(), 3000);
-        }
-        
-        function startAlarm() {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            // Send browser notification
+            if (Notification.permission === 'granted') {
+                new Notification('🚨 PORTFOLIO ALERT!', {
+                    body: `${triggeredAssets.length} asset(s) triggered!`,
+                    requireInteraction: true,
+                    tag: 'portfolio-alert'
+                });
             }
             
-            stopAlarm();
-            
+            // Open popup window if not already open or closed
+            if (!alertWindow || alertWindow.closed) {
+                const alertData = encodeURIComponent(JSON.stringify({
+                    assets: triggeredAssets,
+                    sound: document.getElementById('alarmSound').value
+                }));
+                
+                alertWindow = window.open(
+                    `data:text/html;charset=utf-8,${encodeURIComponent(getAlertHTML(triggeredAssets))}`,
+                    'PortfolioAlert',
+                    'width=800,height=600,resizable=yes,scrollbars=yes'
+                );
+                
+                // Try to focus the window
+                if (alertWindow) {
+                    alertWindow.focus();
+                }
+            }
+        }
+        
+        function getAlertHTML(assets) {
             const soundType = document.getElementById('alarmSound').value;
             const sound = SOUNDS[soundType];
             
-            oscillator = audioContext.createOscillator();
-            gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            oscillator.frequency.value = sound.freq1;
-            oscillator.type = 'sine';
-            gainNode.gain.value = 0.3;
-            oscillator.start();
-            
-            if (sound.pattern === 'alternating') {
-                let toggle = true;
-                window.alarmInterval = setInterval(() => {
-                    oscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
-                    toggle = !toggle;
-                }, sound.speed);
-            } else if (sound.pattern === 'pulse') {
-                let on = true;
-                window.alarmInterval = setInterval(() => {
-                    gainNode.gain.value = on ? 0.3 : 0;
-                    on = !on;
-                }, sound.speed);
+            return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>🚨 ALERT! 🚨</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #ff0000;
+            color: white;
+            font-family: Arial, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            animation: flash 0.5s infinite;
+        }
+        @keyframes flash {
+            0%, 100% { background: #ff0000; }
+            50% { background: #cc0000; }
+        }
+        .container {
+            text-align: center;
+            padding: 40px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 20px;
+            max-width: 700px;
+        }
+        h1 {
+            font-size: 4em;
+            margin-bottom: 30px;
+            animation: shake 0.3s infinite;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+        .alert-list {
+            background: rgba(255,255,255,0.2);
+            padding: 30px;
+            border-radius: 15px;
+            margin: 30px 0;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .alert-item {
+            background: white;
+            color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .alert-type {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .alert-type.high { background: #ff4444; color: white; }
+        .alert-type.low { background: #ffaa00; color: white; }
+        button {
+            background: #ffcc00;
+            color: #333;
+            border: none;
+            padding: 20px 40px;
+            font-size: 1.5em;
+            font-weight: bold;
+            border-radius: 10px;
+            cursor: pointer;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        button:hover {
+            background: #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🚨 ALERT! ALERT! 🚨</h1>
+        <h2>${assets.length} ASSET${assets.length > 1 ? 'S' : ''} TRIGGERED</h2>
+        
+        <div class="alert-list">
+            ${assets.map(a => `
+                <div class="alert-item">
+                    <div class="alert-type ${a.type.toLowerCase()}">${a.type} ALERT</div>
+                    <strong>${a.asset}</strong><br>
+                    Current: $${a.currentPrice.toFixed(2)}<br>
+                    Threshold: $${a.threshold.toFixed(2)}
+                </div>
+            `).join('')}
+        </div>
+        
+        <button onclick="dismissAndClose()">🔕 DISMISS & CLOSE</button>
+    </div>
+    
+    <script>
+        // Flash title in taskbar
+        let titleFlash = true;
+        setInterval(() => {
+            document.title = titleFlash ? '🚨 ALERT! 🚨' : '⚠️ PORTFOLIO ALERT ⚠️';
+            titleFlash = !titleFlash;
+        }, 500);
+        
+        // Try to keep focus
+        setInterval(() => {
+            window.focus();
+        }, 1000);
+        
+        // Start alarm
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        oscillator.frequency.value = ${sound.freq1};
+        oscillator.type = 'sine';
+        gainNode.gain.value = 0.5;
+        oscillator.start();
+        
+        ${sound.pattern === 'alternating' ? `
+        let toggle = true;
+        setInterval(() => {
+            oscillator.frequency.value = toggle ? ${sound.freq1} : ${sound.freq2};
+            toggle = !toggle;
+        }, ${sound.speed});
+        ` : ''}
+        
+        ${sound.pattern === 'pulse' ? `
+        let on = true;
+        setInterval(() => {
+            gainNode.gain.value = on ? 0.5 : 0;
+            on = !on;
+        }, ${sound.speed});
+        ` : ''}
+        
+        function dismissAndClose() {
+            if (window.opener && !window.opener.closed) {
+                window.opener.postMessage('dismiss', '*');
             }
+            window.close();
+        }
+    </script>
+</body>
+</html>
+            `;
         }
         
-        function stopAlarm() {
-            if (window.alarmInterval) {
-                clearInterval(window.alarmInterval);
-                window.alarmInterval = null;
+        // Listen for dismiss message from popup
+        window.addEventListener('message', (event) => {
+            if (event.data === 'dismiss') {
+                triggeredAssets.forEach(alert => {
+                    dismissedAlerts.add(alert.key);
+                });
             }
-            if (oscillator) {
-                oscillator.stop();
-                oscillator = null;
-            }
-            if (gainNode) {
-                gainNode = null;
+        });
+        
+        function testAlarm() {
+            const testAssets = [{
+                asset: 'Test Asset (TEST)',
+                currentPrice: 100.00,
+                threshold: 95.00,
+                type: 'HIGH',
+                key: 'test-HIGH'
+            }];
+            
+            const alertData = encodeURIComponent(JSON.stringify({
+                assets: testAssets,
+                sound: document.getElementById('alarmSound').value
+            }));
+            
+            const testWindow = window.open(
+                `data:text/html;charset=utf-8,${encodeURIComponent(getAlertHTML(testAssets))}`,
+                'TestAlert',
+                'width=800,height=600,resizable=yes,scrollbars=yes'
+            );
+            
+            if (testWindow) {
+                testWindow.focus();
             }
         }
     </script>
