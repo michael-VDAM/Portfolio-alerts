@@ -95,7 +95,7 @@
     <script>
         var API_TOKEN = 'cd5b1a01-8720-47c4-b0e7-fdf38a6f7d67';
         var DOC_ID = 'hZ3P_5oLA4';
-        var TABLE_NAME = 'Portfolio Snapshot';
+        var TABLE_NAME = 'Portfolio View - Nancy';
         var HIGH_ALERT_COL = '\uD83D\uDEA8 High Alert';
         var LOW_ALERT_COL = '\u26A0\uFE0F Low Alert';
         
@@ -191,6 +191,9 @@
                 headers: { 'Authorization': 'Bearer ' + API_TOKEN }
             })
             .then(function(response) {
+                if (!response.ok) {
+                    throw new Error('API returned ' + response.status);
+                }
                 return response.json();
             })
             .then(function(data) {
@@ -211,12 +214,15 @@
                     var high = parseFloat(highStr.replace(/[$,]/g, ''));
                     var low = parseFloat(lowStr.replace(/[$,]/g, ''));
                     
+                    console.log(asset + ': Current=' + current + ', High=' + high + ', Low=' + low);
+                    
                     var status = 'OK';
                     var alertKey = null;
                     
                     if (high > 0 && current >= high) {
-                        status = 'HIGH';
+                        status = 'HIGH ALERT';
                         alertKey = asset + '-HIGH';
+                        console.log('HIGH ALERT: ' + asset);
                         if (!dismissed[alertKey]) {
                             triggered.push({
                                 asset: asset,
@@ -226,8 +232,9 @@
                             });
                         }
                     } else if (low > 0 && current <= low) {
-                        status = 'LOW';
+                        status = 'LOW ALERT';
                         alertKey = asset + '-LOW';
+                        console.log('LOW ALERT: ' + asset);
                         if (!dismissed[alertKey]) {
                             triggered.push({
                                 asset: asset,
