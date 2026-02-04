@@ -15,7 +15,7 @@
             background: white;
             border-radius: 20px;
             padding: 30px;
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
         h1 { text-align: center; margin-bottom: 20px; }
@@ -77,9 +77,10 @@
         .btn-stop { background: #888; color: white; }
         .btn-test { background: #ff4444; color: white; }
         .btn-preview { background: #4caf50; color: white; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #1e3c72; color: white; }
+        .price { font-family: 'Courier New', monospace; }
     </style>
 </head>
 <body>
@@ -127,7 +128,7 @@
             <thead>
                 <tr>
                     <th>Asset</th>
-                    <th>Current Price</th>
+                    <th>Current Price (Full Precision)</th>
                     <th>Low Alert</th>
                     <th>High Alert</th>
                     <th>Status</th>
@@ -198,6 +199,21 @@
             return SOUND_PATTERNS[soundType];
         }
         
+        function formatPrice(price) {
+            // Show full precision - trim trailing zeros but keep at least 2 decimals
+            var formatted = price.toFixed(8);
+            // Remove trailing zeros after decimal
+            formatted = formatted.replace(/\.?0+$/, '');
+            // If we ended up with no decimals or just one, ensure at least 2
+            var parts = formatted.split('.');
+            if (parts.length === 1) {
+                formatted += '.00';
+            } else if (parts[1].length === 1) {
+                formatted += '0';
+            }
+            return '$' + formatted;
+        }
+        
         function playAlarm() {
             if (!audioContext) {
                 console.log('Audio not initialized');
@@ -238,7 +254,6 @@
                 }
             } else if (sound.type === 'pleasant') {
                 if (sound.pattern === 'chord') {
-                    // Play all notes simultaneously
                     var oscillators = [];
                     for (var i = 0; i < sound.notes.length; i++) {
                         var osc = audioContext.createOscillator();
@@ -253,15 +268,12 @@
                     }
                     window.alarmOscillators = oscillators;
                     
-                    // Repeat every 2 seconds
                     window.alarmInterval = setInterval(function() {
-                        // Stop old oscillators
                         if (window.alarmOscillators) {
                             for (var j = 0; j < window.alarmOscillators.length; j++) {
                                 try { window.alarmOscillators[j].stop(); } catch(e) {}
                             }
                         }
-                        // Start new ones
                         var newOscs = [];
                         for (var k = 0; k < sound.notes.length; k++) {
                             var o = audioContext.createOscillator();
@@ -277,7 +289,6 @@
                         window.alarmOscillators = newOscs;
                     }, 2000);
                 } else if (sound.pattern === 'sequence') {
-                    // Play notes in sequence
                     var noteIndex = 0;
                     
                     function playNextNote() {
@@ -458,7 +469,7 @@
             playAlarm();
             openAlertWindow([{
                 asset: 'Test Bitcoin',
-                currentPrice: 96500,
+                currentPrice: 96500.123456,
                 threshold: 95000,
                 type: 'HIGH'
             }]);
@@ -491,9 +502,13 @@
                     var highStr = String(values[HIGH_ALERT_COL] || '0');
                     var lowStr = String(values[LOW_ALERT_COL] || '0');
                     
+                    // Parse with full precision
                     var current = parseFloat(currentStr.replace(/[$,]/g, ''));
                     var high = parseFloat(highStr.replace(/[$,]/g, ''));
                     var low = parseFloat(lowStr.replace(/[$,]/g, ''));
+                    
+                    // Log full precision for debugging
+                    console.log(asset + ': Current=' + current + ' (full precision), High=' + high + ', Low=' + low);
                     
                     var status = 'OK';
                     var alertKey = null;
@@ -527,9 +542,9 @@
                     
                     html += '<tr>';
                     html += '<td>' + asset + '</td>';
-                    html += '<td>$' + current.toFixed(2) + '</td>';
-                    html += '<td>$' + low.toFixed(2) + '</td>';
-                    html += '<td>$' + high.toFixed(2) + '</td>';
+                    html += '<td class="price">' + formatPrice(current) + '</td>';
+                    html += '<td class="price">' + formatPrice(low) + '</td>';
+                    html += '<td class="price">' + formatPrice(high) + '</td>';
                     html += '<td>' + status + '</td>';
                     html += '</tr>';
                 }
@@ -569,6 +584,7 @@
             popupHTML += '.box{text-align:center;padding:40px;background:rgba(0,0,0,0.3);border-radius:20px}';
             popupHTML += 'h1{font-size:3em;margin-bottom:20px}';
             popupHTML += '.item{background:#fff;color:#333;padding:15px;border-radius:10px;margin:10px 0}';
+            popupHTML += '.price{font-family:monospace;}';
             popupHTML += 'button{background:#fc0;color:#333;border:none;padding:15px 30px;font-size:1.2em;border-radius:10px;cursor:pointer;margin-top:20px}';
             popupHTML += '</style></head><body>';
             popupHTML += '<div class="box"><h1>ALERT!</h1>';
@@ -578,8 +594,8 @@
                 popupHTML += '<div class="item">';
                 popupHTML += '<strong>' + a.asset + '</strong><br>';
                 popupHTML += a.type + ' ALERT<br>';
-                popupHTML += 'Current: $' + a.currentPrice.toFixed(2);
-                popupHTML += ' | Threshold: $' + a.threshold.toFixed(2);
+                popupHTML += '<span class="price">Current: ' + formatPrice(a.currentPrice);
+                popupHTML += ' | Threshold: ' + formatPrice(a.threshold) + '</span>';
                 popupHTML += '</div>';
             }
             
