@@ -101,11 +101,64 @@
         
         var interval = null;
         var dismissed = {};
+        var audioContext = null;
+        var mainOscillator = null;
+        var mainGain = null;
+        
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('Audio initialized!');
+            }
+        }
+        
+        function playAlarm() {
+            if (!audioContext) {
+                console.log('Audio not initialized');
+                return;
+            }
+            
+            stopAlarm();
+            
+            mainOscillator = audioContext.createOscillator();
+            mainGain = audioContext.createGain();
+            
+            mainOscillator.connect(mainGain);
+            mainGain.connect(audioContext.destination);
+            mainOscillator.frequency.value = 800;
+            mainOscillator.type = 'sine';
+            mainGain.gain.value = 0.4;
+            mainOscillator.start();
+            
+            var toggle = true;
+            window.alarmInterval = setInterval(function() {
+                if (mainOscillator) {
+                    mainOscillator.frequency.value = toggle ? 800 : 1000;
+                    toggle = !toggle;
+                }
+            }, 300);
+            
+            console.log('ALARM PLAYING!');
+        }
+        
+        function stopAlarm() {
+            if (window.alarmInterval) {
+                clearInterval(window.alarmInterval);
+                window.alarmInterval = null;
+            }
+            if (mainOscillator) {
+                try {
+                    mainOscillator.stop();
+                } catch (e) {}
+                mainOscillator = null;
+            }
+        }
         
         document.getElementById('startBtn').onclick = function() {
-            console.log('Start clicked');
+            console.log('Start clicked - initializing audio');
+            initAudio();
             document.getElementById('indicator').classList.add('active');
-            document.getElementById('status').textContent = 'Monitoring...';
+            document.getElementById('status').textContent = 'Monitoring... (Audio Ready)';
             checkPrices();
             interval = setInterval(checkPrices, 30000);
         };
@@ -113,12 +166,15 @@
         document.getElementById('stopBtn').onclick = function() {
             console.log('Stop clicked');
             if (interval) clearInterval(interval);
+            stopAlarm();
             document.getElementById('indicator').classList.remove('active');
             document.getElementById('status').textContent = 'Stopped';
         };
         
         document.getElementById('testBtn').onclick = function() {
             console.log('Test clicked');
+            initAudio();
+            playAlarm();
             openAlertWindow([{
                 asset: 'Test Bitcoin',
                 currentPrice: 96500,
@@ -201,7 +257,8 @@
                 document.getElementById('lastCheck').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
                 
                 if (triggered.length > 0) {
-                    console.log(triggered.length + ' alerts triggered');
+                    console.log(triggered.length + ' alerts triggered - PLAYING ALARM');
+                    playAlarm();
                     openAlertWindow(triggered);
                 }
             })
@@ -240,23 +297,35 @@
                 popupHTML += '</div>';
             }
             
-            popupHTML += '<button onclick="window.close()">DISMISS</button></div>';
+            popupHTML += '<button onclick="dismissAlert()">DISMISS</button></div>';
             popupHTML += '<script>';
-            popupHTML += 'var ctx=new AudioContext();';
+            popupHTML += 'var ctx=new (window.AudioContext||window.webkitAudioContext)();';
             popupHTML += 'var osc=ctx.createOscillator();';
             popupHTML += 'var gain=ctx.createGain();';
             popupHTML += 'osc.connect(gain);';
             popupHTML += 'gain.connect(ctx.destination);';
             popupHTML += 'osc.frequency.value=800;';
-            popupHTML += 'gain.gain.value=0.3;';
+            popupHTML += 'gain.gain.value=0.4;';
             popupHTML += 'osc.start();';
             popupHTML += 'var t=true;';
             popupHTML += 'setInterval(function(){osc.frequency.value=t?800:1000;t=!t},300);';
+            popupHTML += 'function dismissAlert(){';
+            popupHTML += 'if(window.opener&&!window.opener.closed){';
+            popupHTML += 'window.opener.postMessage("dismiss","*");';
+            popupHTML += '}';
+            popupHTML += 'window.close();';
+            popupHTML += '}';
             popupHTML += '<\/script></body></html>';
             
             popup.document.write(popupHTML);
             popup.document.close();
         }
+        
+        window.addEventListener('message', function(event) {
+            if (event.data === 'dismiss') {
+                stopAlarm();
+            }
+        });
     </script>
 </body>
 </html>
