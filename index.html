@@ -81,11 +81,23 @@
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #1e3c72; color: white; }
         .price { font-family: 'Courier New', monospace; }
+        .debug-info {
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            border-left: 4px solid #ffc107;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Portfolio Alert Monitor</h1>
+        
+        <div class="debug-info">
+            <strong>🔍 Debug Mode:</strong> Check browser console (F12) to see full precision values from Coda
+        </div>
         
         <div class="status">
             <span class="indicator" id="indicator"></span>
@@ -158,15 +170,12 @@
         var previewGain = null;
         
         var SOUND_PATTERNS = {
-            // URGENT SOUNDS
             siren: { type: 'urgent', freq1: 800, freq2: 1000, speed: 300, pattern: 'alternating' },
             urgent: { type: 'urgent', freq1: 1000, freq2: 1400, speed: 150, pattern: 'alternating' },
             woop: { type: 'urgent', freq1: 600, freq2: 800, speed: 250, pattern: 'alternating' },
             buzz: { type: 'urgent', freq1: 200, freq2: 200, speed: 100, pattern: 'pulse' },
             horn: { type: 'urgent', freq1: 440, freq2: 440, speed: 0, pattern: 'continuous' },
             rapid: { type: 'urgent', freq1: 1200, freq2: 1200, speed: 100, pattern: 'pulse' },
-            
-            // PLEASANT SOUNDS
             chime: { type: 'pleasant', notes: [523, 659, 784, 1047], speed: 400, pattern: 'sequence' },
             bells: { type: 'pleasant', notes: [523, 587, 659, 784], speed: 600, pattern: 'sequence' },
             harp: { type: 'pleasant', notes: [262, 330, 392, 523, 659, 784], speed: 150, pattern: 'sequence' },
@@ -176,13 +185,11 @@
             notify: { type: 'pleasant', notes: [880, 1047], speed: 200, pattern: 'sequence' }
         };
         
-        // Load saved sound preference
         var savedSound = localStorage.getItem('alarmSound');
         if (savedSound && SOUND_PATTERNS[savedSound]) {
             document.getElementById('soundSelect').value = savedSound;
         }
         
-        // Save sound preference when changed
         document.getElementById('soundSelect').onchange = function() {
             localStorage.setItem('alarmSound', this.value);
         };
@@ -199,12 +206,37 @@
             return SOUND_PATTERNS[soundType];
         }
         
+        function extractNumber(value) {
+            // Handle different value types from Coda API
+            console.log('Raw value from Coda:', value, 'Type:', typeof value);
+            
+            if (typeof value === 'number') {
+                return value;
+            }
+            
+            if (typeof value === 'string') {
+                // Remove $, commas, and any other formatting
+                var cleaned = value.replace(/[$,\s]/g, '');
+                return parseFloat(cleaned) || 0;
+            }
+            
+            if (typeof value === 'object' && value !== null) {
+                // Coda might return an object with value property
+                if (value.value !== undefined) {
+                    return extractNumber(value.value);
+                }
+                if (value.amount !== undefined) {
+                    return extractNumber(value.amount);
+                }
+            }
+            
+            return 0;
+        }
+        
         function formatPrice(price) {
-            // Show full precision - trim trailing zeros but keep at least 2 decimals
+            // Show up to 8 decimals, remove trailing zeros
             var formatted = price.toFixed(8);
-            // Remove trailing zeros after decimal
             formatted = formatted.replace(/\.?0+$/, '');
-            // If we ended up with no decimals or just one, ensure at least 2
             var parts = formatted.split('.');
             if (parts.length === 1) {
                 formatted += '.00';
@@ -392,7 +424,7 @@
                         }
                     }, sound.speed);
                 }
-            } else if (sound.type === 'pleasant') {
+            } else if (sound.pattern === 'pleasant') {
                 if (sound.pattern === 'chord') {
                     var oscillators = [];
                     for (var i = 0; i < sound.notes.length; i++) {
@@ -476,8 +508,9 @@
         };
         
         function checkPrices() {
-            console.log('Checking prices...');
-            var url = 'https://coda.io/apis/v1/docs/' + DOC_ID + '/tables/' + encodeURIComponent(TABLE_NAME) + '/rows?useColumnNames=true';
+            console.log('=== CHECKING PRICES ===');
+            console.log('Fetching WITHOUT useColumnNames to get raw values...');
+            var url = 'https://coda.io/apis/v1/docs/' + DOC_ID + '/tables/' + encodeURIComponent(TABLE_NAME) + '/rows?valueFormat=simple';
             
             fetch(url, {
                 headers: { 'Authorization': 'Bearer ' + API_TOKEN }
@@ -491,24 +524,44 @@
             .then(function(data) {
                 var rows = data.items || [];
                 console.log('Got ' + rows.length + ' rows');
+                console.log('Sample row structure:', rows[0]);
                 
                 var triggered = [];
                 var html = '';
                 
                 for (var i = 0; i < rows.length; i++) {
-                    var values = rows[i].values;
-                    var asset = values['Asset Name (ticker)'] || 'Unknown';
-                    var currentStr = String(values['Current Price'] || '0');
-                    var highStr = String(values[HIGH_ALERT_COL] || '0');
-                    var lowStr = String(values[LOW_ALERT_COL] || '0');
+                    var row = rows[i];
+                    var values = row.values || {};
                     
-                    // Parse with full precision
-                    var current = parseFloat(currentStr.replace(/[$,]/g, ''));
-                    var high = parseFloat(highStr.replace(/[$,]/g, ''));
-                    var low = parseFloat(lowStr.replace(/[$,]/g, ''));
+                    // Get asset name
+                    var asset = '';
+                    for (var key in values) {
+                        if (key.toLowerCase().includes('asset') && key.toLowerCase().includes('name')) {
+                            asset = values[key];
+                            break;
+                        }
+                    }
+                    if (!asset) asset = 'Unknown';
                     
-                    // Log full precision for debugging
-                    console.log(asset + ': Current=' + current + ' (full precision), High=' + high + ', Low=' + low);
+                    // Find Current Price, High Alert, Low Alert columns
+                    var current = 0;
+                    var high = 0;
+                    var low = 0;
+                    
+                    for (var colKey in values) {
+                        var val = values[colKey];
+                        console.log(asset + ' - Column:', colKey, '=', val, '(type:', typeof val, ')');
+                        
+                        if (colKey.toLowerCase().includes('current') && colKey.toLowerCase().includes('price')) {
+                            current = extractNumber(val);
+                        } else if (colKey.includes('\uD83D\uDEA8') || (colKey.toLowerCase().includes('high') && colKey.toLowerCase().includes('alert'))) {
+                            high = extractNumber(val);
+                        } else if (colKey.includes('\u26A0') || (colKey.toLowerCase().includes('low') && colKey.toLowerCase().includes('alert'))) {
+                            low = extractNumber(val);
+                        }
+                    }
+                    
+                    console.log('==> ' + asset + ': Current=' + current + ', High=' + high + ', Low=' + low);
                     
                     var status = 'OK';
                     var alertKey = null;
@@ -516,6 +569,7 @@
                     if (high > 0 && current >= high) {
                         status = 'HIGH ALERT';
                         alertKey = asset + '-HIGH';
+                        console.log('!!! HIGH ALERT FOR ' + asset + ': ' + current + ' >= ' + high);
                         if (!dismissed[alertKey]) {
                             triggered.push({
                                 asset: asset,
@@ -527,6 +581,7 @@
                     } else if (low > 0 && current <= low) {
                         status = 'LOW ALERT';
                         alertKey = asset + '-LOW';
+                        console.log('!!! LOW ALERT FOR ' + asset + ': ' + current + ' <= ' + low);
                         if (!dismissed[alertKey]) {
                             triggered.push({
                                 asset: asset,
@@ -556,7 +611,7 @@
                 document.getElementById('lastCheck').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
                 
                 if (triggered.length > 0) {
-                    console.log(triggered.length + ' alerts triggered - PLAYING ALARM');
+                    console.log('🚨🚨🚨 ' + triggered.length + ' alerts triggered - PLAYING ALARM');
                     playAlarm();
                     openAlertWindow(triggered);
                 }
