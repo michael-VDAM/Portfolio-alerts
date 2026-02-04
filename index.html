@@ -58,6 +58,11 @@
             border-radius: 5px;
             border: 2px solid #ddd;
             margin-right: 10px;
+            min-width: 250px;
+        }
+        .sound-selector optgroup {
+            font-weight: bold;
+            font-style: normal;
         }
         button {
             padding: 15px 30px;
@@ -91,14 +96,23 @@
         <div class="sound-selector">
             <label>Alarm Sound:</label>
             <select id="soundSelect">
-                <option value="siren">🚨 Siren (Classic)</option>
-                <option value="urgent">⚠️ Urgent Alarm</option>
-                <option value="beep">📢 Beep Beep</option>
-                <option value="woop">🚓 Police Siren</option>
-                <option value="buzz">📳 Intense Buzz</option>
-                <option value="horn">📯 Air Horn</option>
-                <option value="rapid">⏰ Rapid Beeps</option>
-                <option value="warble">🔔 Warble</option>
+                <optgroup label="🚨 URGENT (Loud & Jarring)">
+                    <option value="siren">🚨 Siren (Classic)</option>
+                    <option value="urgent">⚠️ Urgent Alarm</option>
+                    <option value="woop">🚓 Police Siren</option>
+                    <option value="buzz">📳 Intense Buzz</option>
+                    <option value="horn">📯 Air Horn</option>
+                    <option value="rapid">⏰ Rapid Beeps</option>
+                </optgroup>
+                <optgroup label="🔔 PLEASANT (Gentle & Melodic)">
+                    <option value="chime">🔔 Wind Chimes</option>
+                    <option value="bells">🎵 Church Bells</option>
+                    <option value="harp">🎶 Harp Glissando</option>
+                    <option value="piano">🎹 Piano Chord</option>
+                    <option value="marimba">🥁 Marimba</option>
+                    <option value="arpeggio">✨ Arpeggio</option>
+                    <option value="notify">📱 Notification Tone</option>
+                </optgroup>
             </select>
             <button class="btn-preview" id="previewBtn">Preview Sound</button>
         </div>
@@ -136,19 +150,29 @@
         var dismissed = {};
         var audioContext = null;
         var mainOscillator = null;
+        var mainOscillator2 = null;
         var mainGain = null;
         var previewOscillator = null;
+        var previewOscillator2 = null;
         var previewGain = null;
         
         var SOUND_PATTERNS = {
-            siren: { freq1: 800, freq2: 1000, speed: 300, pattern: 'alternating' },
-            urgent: { freq1: 1000, freq2: 1400, speed: 150, pattern: 'alternating' },
-            beep: { freq1: 880, freq2: 880, speed: 200, pattern: 'pulse' },
-            woop: { freq1: 600, freq2: 800, speed: 250, pattern: 'alternating' },
-            buzz: { freq1: 200, freq2: 200, speed: 100, pattern: 'pulse' },
-            horn: { freq1: 440, freq2: 440, speed: 0, pattern: 'continuous' },
-            rapid: { freq1: 1200, freq2: 1200, speed: 100, pattern: 'pulse' },
-            warble: { freq1: 700, freq2: 900, speed: 400, pattern: 'alternating' }
+            // URGENT SOUNDS
+            siren: { type: 'urgent', freq1: 800, freq2: 1000, speed: 300, pattern: 'alternating' },
+            urgent: { type: 'urgent', freq1: 1000, freq2: 1400, speed: 150, pattern: 'alternating' },
+            woop: { type: 'urgent', freq1: 600, freq2: 800, speed: 250, pattern: 'alternating' },
+            buzz: { type: 'urgent', freq1: 200, freq2: 200, speed: 100, pattern: 'pulse' },
+            horn: { type: 'urgent', freq1: 440, freq2: 440, speed: 0, pattern: 'continuous' },
+            rapid: { type: 'urgent', freq1: 1200, freq2: 1200, speed: 100, pattern: 'pulse' },
+            
+            // PLEASANT SOUNDS
+            chime: { type: 'pleasant', notes: [523, 659, 784, 1047], speed: 400, pattern: 'sequence' },
+            bells: { type: 'pleasant', notes: [523, 587, 659, 784], speed: 600, pattern: 'sequence' },
+            harp: { type: 'pleasant', notes: [262, 330, 392, 523, 659, 784], speed: 150, pattern: 'sequence' },
+            piano: { type: 'pleasant', notes: [262, 330, 392], speed: 0, pattern: 'chord' },
+            marimba: { type: 'pleasant', notes: [392, 494, 587, 784], speed: 300, pattern: 'sequence' },
+            arpeggio: { type: 'pleasant', notes: [440, 554, 659, 880], speed: 200, pattern: 'sequence' },
+            notify: { type: 'pleasant', notes: [880, 1047], speed: 200, pattern: 'sequence' }
         };
         
         // Load saved sound preference
@@ -184,32 +208,98 @@
             
             var sound = getSelectedSound();
             
-            mainOscillator = audioContext.createOscillator();
-            mainGain = audioContext.createGain();
-            
-            mainOscillator.connect(mainGain);
-            mainGain.connect(audioContext.destination);
-            mainOscillator.frequency.value = sound.freq1;
-            mainOscillator.type = 'sine';
-            mainGain.gain.value = 0.4;
-            mainOscillator.start();
-            
-            if (sound.pattern === 'alternating') {
-                var toggle = true;
-                window.alarmInterval = setInterval(function() {
-                    if (mainOscillator) {
-                        mainOscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
-                        toggle = !toggle;
+            if (sound.type === 'urgent') {
+                mainOscillator = audioContext.createOscillator();
+                mainGain = audioContext.createGain();
+                
+                mainOscillator.connect(mainGain);
+                mainGain.connect(audioContext.destination);
+                mainOscillator.frequency.value = sound.freq1;
+                mainOscillator.type = 'sine';
+                mainGain.gain.value = 0.4;
+                mainOscillator.start();
+                
+                if (sound.pattern === 'alternating') {
+                    var toggle = true;
+                    window.alarmInterval = setInterval(function() {
+                        if (mainOscillator) {
+                            mainOscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
+                            toggle = !toggle;
+                        }
+                    }, sound.speed);
+                } else if (sound.pattern === 'pulse') {
+                    var on = true;
+                    window.alarmInterval = setInterval(function() {
+                        if (mainGain) {
+                            mainGain.gain.value = on ? 0.4 : 0;
+                            on = !on;
+                        }
+                    }, sound.speed);
+                }
+            } else if (sound.type === 'pleasant') {
+                if (sound.pattern === 'chord') {
+                    // Play all notes simultaneously
+                    var oscillators = [];
+                    for (var i = 0; i < sound.notes.length; i++) {
+                        var osc = audioContext.createOscillator();
+                        var gain = audioContext.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioContext.destination);
+                        osc.frequency.value = sound.notes[i];
+                        osc.type = 'sine';
+                        gain.gain.value = 0.2;
+                        osc.start();
+                        oscillators.push(osc);
                     }
-                }, sound.speed);
-            } else if (sound.pattern === 'pulse') {
-                var on = true;
-                window.alarmInterval = setInterval(function() {
-                    if (mainGain) {
-                        mainGain.gain.value = on ? 0.4 : 0;
-                        on = !on;
+                    window.alarmOscillators = oscillators;
+                    
+                    // Repeat every 2 seconds
+                    window.alarmInterval = setInterval(function() {
+                        // Stop old oscillators
+                        if (window.alarmOscillators) {
+                            for (var j = 0; j < window.alarmOscillators.length; j++) {
+                                try { window.alarmOscillators[j].stop(); } catch(e) {}
+                            }
+                        }
+                        // Start new ones
+                        var newOscs = [];
+                        for (var k = 0; k < sound.notes.length; k++) {
+                            var o = audioContext.createOscillator();
+                            var g = audioContext.createGain();
+                            o.connect(g);
+                            g.connect(audioContext.destination);
+                            o.frequency.value = sound.notes[k];
+                            o.type = 'sine';
+                            g.gain.value = 0.2;
+                            o.start();
+                            newOscs.push(o);
+                        }
+                        window.alarmOscillators = newOscs;
+                    }, 2000);
+                } else if (sound.pattern === 'sequence') {
+                    // Play notes in sequence
+                    var noteIndex = 0;
+                    
+                    function playNextNote() {
+                        if (mainOscillator) {
+                            try { mainOscillator.stop(); } catch(e) {}
+                        }
+                        
+                        mainOscillator = audioContext.createOscillator();
+                        mainGain = audioContext.createGain();
+                        mainOscillator.connect(mainGain);
+                        mainGain.connect(audioContext.destination);
+                        mainOscillator.frequency.value = sound.notes[noteIndex];
+                        mainOscillator.type = 'sine';
+                        mainGain.gain.value = 0.3;
+                        mainOscillator.start();
+                        
+                        noteIndex = (noteIndex + 1) % sound.notes.length;
                     }
-                }, sound.speed);
+                    
+                    playNextNote();
+                    window.alarmInterval = setInterval(playNextNote, sound.speed);
+                }
             }
             
             console.log('ALARM PLAYING!');
@@ -221,10 +311,18 @@
                 window.alarmInterval = null;
             }
             if (mainOscillator) {
-                try {
-                    mainOscillator.stop();
-                } catch (e) {}
+                try { mainOscillator.stop(); } catch (e) {}
                 mainOscillator = null;
+            }
+            if (mainOscillator2) {
+                try { mainOscillator2.stop(); } catch (e) {}
+                mainOscillator2 = null;
+            }
+            if (window.alarmOscillators) {
+                for (var i = 0; i < window.alarmOscillators.length; i++) {
+                    try { window.alarmOscillators[i].stop(); } catch(e) {}
+                }
+                window.alarmOscillators = null;
             }
         }
         
@@ -234,10 +332,18 @@
                 window.previewInterval = null;
             }
             if (previewOscillator) {
-                try {
-                    previewOscillator.stop();
-                } catch (e) {}
+                try { previewOscillator.stop(); } catch (e) {}
                 previewOscillator = null;
+            }
+            if (previewOscillator2) {
+                try { previewOscillator2.stop(); } catch (e) {}
+                previewOscillator2 = null;
+            }
+            if (window.previewOscillators) {
+                for (var i = 0; i < window.previewOscillators.length; i++) {
+                    try { window.previewOscillators[i].stop(); } catch(e) {}
+                }
+                window.previewOscillators = null;
             }
         }
         
@@ -247,32 +353,72 @@
             
             var sound = getSelectedSound();
             
-            previewOscillator = audioContext.createOscillator();
-            previewGain = audioContext.createGain();
-            
-            previewOscillator.connect(previewGain);
-            previewGain.connect(audioContext.destination);
-            previewOscillator.frequency.value = sound.freq1;
-            previewOscillator.type = 'sine';
-            previewGain.gain.value = 0.3;
-            previewOscillator.start();
-            
-            if (sound.pattern === 'alternating') {
-                var toggle = true;
-                window.previewInterval = setInterval(function() {
-                    if (previewOscillator) {
-                        previewOscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
-                        toggle = !toggle;
+            if (sound.type === 'urgent') {
+                previewOscillator = audioContext.createOscillator();
+                previewGain = audioContext.createGain();
+                
+                previewOscillator.connect(previewGain);
+                previewGain.connect(audioContext.destination);
+                previewOscillator.frequency.value = sound.freq1;
+                previewOscillator.type = 'sine';
+                previewGain.gain.value = 0.3;
+                previewOscillator.start();
+                
+                if (sound.pattern === 'alternating') {
+                    var toggle = true;
+                    window.previewInterval = setInterval(function() {
+                        if (previewOscillator) {
+                            previewOscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
+                            toggle = !toggle;
+                        }
+                    }, sound.speed);
+                } else if (sound.pattern === 'pulse') {
+                    var on = true;
+                    window.previewInterval = setInterval(function() {
+                        if (previewGain) {
+                            previewGain.gain.value = on ? 0.3 : 0;
+                            on = !on;
+                        }
+                    }, sound.speed);
+                }
+            } else if (sound.type === 'pleasant') {
+                if (sound.pattern === 'chord') {
+                    var oscillators = [];
+                    for (var i = 0; i < sound.notes.length; i++) {
+                        var osc = audioContext.createOscillator();
+                        var gain = audioContext.createGain();
+                        osc.connect(gain);
+                        gain.connect(audioContext.destination);
+                        osc.frequency.value = sound.notes[i];
+                        osc.type = 'sine';
+                        gain.gain.value = 0.15;
+                        osc.start();
+                        oscillators.push(osc);
                     }
-                }, sound.speed);
-            } else if (sound.pattern === 'pulse') {
-                var on = true;
-                window.previewInterval = setInterval(function() {
-                    if (previewGain) {
-                        previewGain.gain.value = on ? 0.3 : 0;
-                        on = !on;
+                    window.previewOscillators = oscillators;
+                } else if (sound.pattern === 'sequence') {
+                    var noteIndex = 0;
+                    
+                    function playPreviewNote() {
+                        if (previewOscillator) {
+                            try { previewOscillator.stop(); } catch(e) {}
+                        }
+                        
+                        previewOscillator = audioContext.createOscillator();
+                        previewGain = audioContext.createGain();
+                        previewOscillator.connect(previewGain);
+                        previewGain.connect(audioContext.destination);
+                        previewOscillator.frequency.value = sound.notes[noteIndex];
+                        previewOscillator.type = 'sine';
+                        previewGain.gain.value = 0.2;
+                        previewOscillator.start();
+                        
+                        noteIndex = (noteIndex + 1) % sound.notes.length;
                     }
-                }, sound.speed);
+                    
+                    playPreviewNote();
+                    window.previewInterval = setInterval(playPreviewNote, sound.speed);
+                }
             }
             
             setTimeout(function() {
@@ -432,20 +578,55 @@
             popupHTML += '<button onclick="dismissAlert()">DISMISS</button></div>';
             popupHTML += '<script>';
             popupHTML += 'var ctx=new (window.AudioContext||window.webkitAudioContext)();';
-            popupHTML += 'var osc=ctx.createOscillator();';
-            popupHTML += 'var gain=ctx.createGain();';
-            popupHTML += 'osc.connect(gain);';
-            popupHTML += 'gain.connect(ctx.destination);';
-            popupHTML += 'osc.frequency.value=' + sound.freq1 + ';';
-            popupHTML += 'gain.gain.value=0.4;';
-            popupHTML += 'osc.start();';
             
-            if (sound.pattern === 'alternating') {
-                popupHTML += 'var t=true;';
-                popupHTML += 'setInterval(function(){osc.frequency.value=t?' + sound.freq1 + ':' + sound.freq2 + ';t=!t},' + sound.speed + ');';
-            } else if (sound.pattern === 'pulse') {
-                popupHTML += 'var on=true;';
-                popupHTML += 'setInterval(function(){gain.gain.value=on?0.4:0;on=!on},' + sound.speed + ');';
+            if (sound.type === 'urgent') {
+                popupHTML += 'var osc=ctx.createOscillator();';
+                popupHTML += 'var gain=ctx.createGain();';
+                popupHTML += 'osc.connect(gain);';
+                popupHTML += 'gain.connect(ctx.destination);';
+                popupHTML += 'osc.frequency.value=' + sound.freq1 + ';';
+                popupHTML += 'gain.gain.value=0.4;';
+                popupHTML += 'osc.start();';
+                
+                if (sound.pattern === 'alternating') {
+                    popupHTML += 'var t=true;';
+                    popupHTML += 'setInterval(function(){osc.frequency.value=t?' + sound.freq1 + ':' + sound.freq2 + ';t=!t},' + sound.speed + ');';
+                } else if (sound.pattern === 'pulse') {
+                    popupHTML += 'var on=true;';
+                    popupHTML += 'setInterval(function(){gain.gain.value=on?0.4:0;on=!on},' + sound.speed + ');';
+                }
+            } else if (sound.type === 'pleasant') {
+                popupHTML += 'var notes=' + JSON.stringify(sound.notes) + ';';
+                
+                if (sound.pattern === 'chord') {
+                    popupHTML += 'function playChord(){';
+                    popupHTML += 'var oscs=[];';
+                    popupHTML += 'for(var i=0;i<notes.length;i++){';
+                    popupHTML += 'var o=ctx.createOscillator();';
+                    popupHTML += 'var g=ctx.createGain();';
+                    popupHTML += 'o.connect(g);g.connect(ctx.destination);';
+                    popupHTML += 'o.frequency.value=notes[i];';
+                    popupHTML += 'g.gain.value=0.2;';
+                    popupHTML += 'o.start();oscs.push(o);';
+                    popupHTML += '}';
+                    popupHTML += 'return oscs;';
+                    popupHTML += '}';
+                    popupHTML += 'playChord();';
+                    popupHTML += 'setInterval(function(){playChord()},2000);';
+                } else if (sound.pattern === 'sequence') {
+                    popupHTML += 'var idx=0;';
+                    popupHTML += 'function playNote(){';
+                    popupHTML += 'var o=ctx.createOscillator();';
+                    popupHTML += 'var g=ctx.createGain();';
+                    popupHTML += 'o.connect(g);g.connect(ctx.destination);';
+                    popupHTML += 'o.frequency.value=notes[idx];';
+                    popupHTML += 'g.gain.value=0.3;';
+                    popupHTML += 'o.start();';
+                    popupHTML += 'idx=(idx+1)%notes.length;';
+                    popupHTML += '}';
+                    popupHTML += 'playNote();';
+                    popupHTML += 'setInterval(playNote,' + sound.speed + ');';
+                }
             }
             
             popupHTML += 'function dismissAlert(){';
