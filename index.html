@@ -80,8 +80,8 @@
                 <tr>
                     <th>Asset</th>
                     <th>Current Price</th>
-                    <th>⚠️ Low Alert</th>
-                    <th>🚨 High Alert</th>
+                    <th>Low Alert</th>
+                    <th>High Alert</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -92,190 +92,164 @@
     </div>
 
     <script>
-        const API_TOKEN = 'cd5b1a01-8720-47c4-b0e7-fdf38a6f7d67';
-        const DOC_ID = 'hZ3P_5oLA4';
-        const TABLE_NAME = 'Portfolio Snapshot';
+        var API_TOKEN = 'cd5b1a01-8720-47c4-b0e7-fdf38a6f7d67';
+        var DOC_ID = 'hZ3P_5oLA4';
+        var TABLE_NAME = 'Portfolio Snapshot';
         
-        let interval = null;
-        let dismissed = new Set();
+        var interval = null;
+        var dismissed = {};
         
-        document.getElementById('startBtn').addEventListener('click', function() {
+        document.getElementById('startBtn').onclick = function() {
             console.log('Start clicked');
             document.getElementById('indicator').classList.add('active');
             document.getElementById('status').textContent = 'Monitoring...';
             checkPrices();
             interval = setInterval(checkPrices, 30000);
-        });
+        };
         
-        document.getElementById('stopBtn').addEventListener('click', function() {
+        document.getElementById('stopBtn').onclick = function() {
             console.log('Stop clicked');
             if (interval) clearInterval(interval);
             document.getElementById('indicator').classList.remove('active');
             document.getElementById('status').textContent = 'Stopped';
-        });
+        };
         
-        document.getElementById('testBtn').addEventListener('click', function() {
+        document.getElementById('testBtn').onclick = function() {
             console.log('Test clicked');
-            openAlert([{
+            var testData = [{
                 asset: 'Test Bitcoin (BTC)',
                 currentPrice: 96500,
                 threshold: 95000,
                 type: 'HIGH'
-            }]);
-        });
+            }];
+            openAlert(testData);
+        };
         
-        async function checkPrices() {
-            try {
-                console.log('Checking prices...');
-                const url = `https://coda.io/apis/v1/docs/${DOC_ID}/tables/${encodeURIComponent(TABLE_NAME)}/rows?useColumnNames=true`;
-                const response = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${API_TOKEN}` }
-                });
+        function checkPrices() {
+            console.log('Checking prices...');
+            var url = 'https://coda.io/apis/v1/docs/' + DOC_ID + '/tables/' + encodeURIComponent(TABLE_NAME) + '/rows?useColumnNames=true';
+            
+            fetch(url, {
+                headers: { 'Authorization': 'Bearer ' + API_TOKEN }
+            })
+            .then(function(response) {
+                return response.json();
+            })
+            .then(function(data) {
+                var rows = data.items || [];
+                console.log('Got ' + rows.length + ' rows');
                 
-                const data = await response.json();
-                const rows = data.items || [];
+                var triggered = [];
+                var html = '';
                 
-                console.log(`Got ${rows.length} rows`);
-                
-                let triggered = [];
-                let html = '';
-                
-                rows.forEach(row => {
-                    const values = row.values;
-                    const asset = values['Asset Name (ticker)'] || 'Unknown';
-                    const current = parseFloat(String(values['Current Price'] || '0').replace(/[$,]/g, ''));
-                    const high = parseFloat(String(values['🚨 High Alert'] || '0').replace(/[$,]/g, ''));
-                    const low = parseFloat(String(values['⚠️ Low Alert'] || '0').replace(/[$,]/g, ''));
+                for (var i = 0; i < rows.length; i++) {
+                    var values = rows[i].values;
+                    var asset = values['Asset Name (ticker)'] || 'Unknown';
+                    var current = parseFloat(String(values['Current Price'] || '0').replace(/[$,]/g, ''));
+                    var high = parseFloat(String(values['🚨 High Alert'] || '0').replace(/[$,]/g, ''));
+                    var low = parseFloat(String(values['⚠️ Low Alert'] || '0').replace(/[$,]/g, ''));
                     
-                    let status = '✓ OK';
-                    let alertKey = null;
+                    var status = '✓ OK';
+                    var alertKey = null;
                     
                     if (high > 0 && current >= high) {
                         status = '🔴 HIGH';
                         alertKey = asset + '-HIGH';
-                        if (!dismissed.has(alertKey)) {
-                            triggered.push({ asset, currentPrice: current, threshold: high, type: 'HIGH' });
+                        if (!dismissed[alertKey]) {
+                            triggered.push({
+                                asset: asset,
+                                currentPrice: current,
+                                threshold: high,
+                                type: 'HIGH'
+                            });
                         }
                     } else if (low > 0 && current <= low) {
                         status = '🟡 LOW';
                         alertKey = asset + '-LOW';
-                        if (!dismissed.has(alertKey)) {
-                            triggered.push({ asset, currentPrice: current, threshold: low, type: 'LOW' });
+                        if (!dismissed[alertKey]) {
+                            triggered.push({
+                                asset: asset,
+                                currentPrice: current,
+                                threshold: low,
+                                type: 'LOW'
+                            });
                         }
                     } else {
-                        dismissed.delete(asset + '-HIGH');
-                        dismissed.delete(asset + '-LOW');
+                        delete dismissed[asset + '-HIGH'];
+                        delete dismissed[asset + '-LOW'];
                     }
                     
-                    html += `<tr>
-                        <td>${asset}</td>
-                        <td>$${current.toFixed(2)}</td>
-                        <td>$${low.toFixed(2)}</td>
-                        <td>$${high.toFixed(2)}</td>
-                        <td>${status}</td>
-                    </tr>`;
-                });
+                    html += '<tr>';
+                    html += '<td>' + asset + '</td>';
+                    html += '<td>$' + current.toFixed(2) + '</td>';
+                    html += '<td>$' + low.toFixed(2) + '</td>';
+                    html += '<td>$' + high.toFixed(2) + '</td>';
+                    html += '<td>' + status + '</td>';
+                    html += '</tr>';
+                }
                 
                 document.getElementById('tbody').innerHTML = html;
                 document.getElementById('table').style.display = 'table';
                 document.getElementById('count').textContent = rows.length;
                 document.getElementById('alerts').textContent = triggered.length;
-                document.getElementById('lastCheck').textContent = `Last checked: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('lastCheck').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
                 
                 if (triggered.length > 0) {
-                    console.log(`${triggered.length} alerts!`);
+                    console.log(triggered.length + ' alerts!');
                     openAlert(triggered);
                 }
-                
-            } catch (error) {
+            })
+            .catch(function(error) {
                 console.error('Error:', error);
                 document.getElementById('status').textContent = 'Error: ' + error.message;
-            }
+            });
         }
         
         function openAlert(assets) {
-            const win = window.open('', 'Alert', 'width=700,height=500');
+            var win = window.open('', 'Alert', 'width=700,height=500');
             if (!win) {
-                alert('⚠️ Pop-up blocked! Please allow pop-ups for this site.');
+                alert('Pop-up blocked! Please allow pop-ups.');
                 return;
             }
             
-            win.document.write(`
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <title>🚨 ALERT!</title>
-                    <style>
-                        body {
-                            background: #ff0000;
-                            color: white;
-                            font-family: Arial;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            min-height: 100vh;
-                            animation: flash 0.5s infinite;
-                        }
-                        @keyframes flash {
-                            0%, 100% { background: #ff0000; }
-                            50% { background: #cc0000; }
-                        }
-                        .box {
-                            text-align: center;
-                            padding: 40px;
-                            background: rgba(0,0,0,0.3);
-                            border-radius: 20px;
-                        }
-                        h1 { font-size: 3em; margin-bottom: 20px; }
-                        .item {
-                            background: white;
-                            color: #333;
-                            padding: 15px;
-                            border-radius: 10px;
-                            margin: 10px 0;
-                        }
-                        button {
-                            background: #ffcc00;
-                            color: #333;
-                            border: none;
-                            padding: 15px 30px;
-                            font-size: 1.2em;
-                            border-radius: 10px;
-                            cursor: pointer;
-                            margin-top: 20px;
-                        }
-                    </style>
-                </head>
-                <body>
-                    <div class="box">
-                        <h1>🚨 ALERT! 🚨</h1>
-                        ${assets.map(a => `
-                            <div class="item">
-                                <strong>${a.asset}</strong><br>
-                                ${a.type} ALERT<br>
-                                Current: $${a.currentPrice.toFixed(2)} | Threshold: $${a.threshold.toFixed(2)}
-                            </div>
-                        `).join('')}
-                        <button onclick="window.close()">DISMISS</button>
-                    </div>
-                    <script>
-                        const audio = new AudioContext();
-                        const osc = audio.createOscillator();
-                        const gain = audio.createGain();
-                        osc.connect(gain);
-                        gain.connect(audio.destination);
-                        osc.frequency.value = 800;
-                        gain.gain.value = 0.3;
-                        osc.start();
-                        let toggle = true;
-                        setInterval(() => {
-                            osc.frequency.value = toggle ? 800 : 1000;
-                            toggle = !toggle;
-                        }, 300);
-                    </script>
-                </body>
-                </html>
-            `);
+            var html = '<!DOCTYPE html><html><head><title>ALERT!</title>';
+            html += '<style>';
+            html += 'body { background: #ff0000; color: white; font-family: Arial; display: flex; align-items: center; justify-content: center; min-height: 100vh; animation: flash 0.5s infinite; }';
+            html += '@keyframes flash { 0%, 100% { background: #ff0000; } 50% { background: #cc0000; } }';
+            html += '.box { text-align: center; padding: 40px; background: rgba(0,0,0,0.3); border-radius: 20px; }';
+            html += 'h1 { font-size: 3em; margin-bottom: 20px; }';
+            html += '.item { background: white; color: #333; padding: 15px; border-radius: 10px; margin: 10px 0; }';
+            html += 'button { background: #ffcc00; color: #333; border: none; padding: 15px 30px; font-size: 1.2em; border-radius: 10px; cursor: pointer; margin-top: 20px; }';
+            html += '</style></head><body>';
+            html += '<div class="box">';
+            html += '<h1>🚨 ALERT! 🚨</h1>';
+            
+            for (var i = 0; i < assets.length; i++) {
+                var a = assets[i];
+                html += '<div class="item">';
+                html += '<strong>' + a.asset + '</strong><br>';
+                html += a.type + ' ALERT<br>';
+                html += 'Current: $' + a.currentPrice.toFixed(2) + ' | Threshold: $' + a.threshold.toFixed(2);
+                html += '</div>';
+            }
+            
+            html += '<button onclick="window.close()">DISMISS</button>';
+            html += '</div>';
+            html += '<script>';
+            html += 'var audio = new AudioContext();';
+            html += 'var osc = audio.createOscillator();';
+            html += 'var gain = audio.createGain();';
+            html += 'osc.connect(gain);';
+            html += 'gain.connect(audio.destination);';
+            html += 'osc.frequency.value = 800;';
+            html += 'gain.gain.value = 0.3;';
+            html += 'osc.start();';
+            html += 'var toggle = true;';
+            html += 'setInterval(function() { osc.frequency.value = toggle ? 800 : 1000; toggle = !toggle; }, 300);';
+            html += '</script>';
+            html += '</body></html>';
+            
+            win.document.write(html);
         }
     </script>
 </body>
