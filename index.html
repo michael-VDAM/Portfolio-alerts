@@ -127,7 +127,7 @@
             <thead>
                 <tr>
                     <th>Asset</th>
-                    <th>Current Price</th>
+                    <th>Current Price (3 decimals)</th>
                     <th>Low Alert</th>
                     <th>High Alert</th>
                     <th>Status</th>
@@ -458,8 +458,8 @@
             playAlarm();
             openAlertWindow([{
                 asset: 'Test Bitcoin',
-                currentPrice: 96500.123456,
-                threshold: 95000,
+                currentPrice: 96500.125,
+                threshold: 95000.000,
                 type: 'HIGH'
             }]);
         };
@@ -527,9 +527,9 @@
                     
                     html += '<tr>';
                     html += '<td>' + asset + '</td>';
-                    html += '<td>$' + current.toFixed(2) + '</td>';
-                    html += '<td>$' + low.toFixed(2) + '</td>';
-                    html += '<td>$' + high.toFixed(2) + '</td>';
+                    html += '<td>$' + current.toFixed(3) + '</td>';
+                    html += '<td>$' + low.toFixed(3) + '</td>';
+                    html += '<td>$' + high.toFixed(3) + '</td>';
                     html += '<td>' + status + '</td>';
                     html += '</tr>';
                 }
@@ -579,8 +579,8 @@
                 popupHTML += '<div class="item">';
                 popupHTML += '<strong>' + a.asset + '</strong><br>';
                 popupHTML += a.type + ' ALERT<br>';
-                popupHTML += '<span class="price">Current: $' + a.currentPrice.toFixed(2);
-                popupHTML += ' | Threshold: $' + a.threshold.toFixed(2) + '</span>';
+                popupHTML += '<span class="price">Current: $' + a.currentPrice.toFixed(3);
+                popupHTML += ' | Threshold: $' + a.threshold.toFixed(3) + '</span>';
                 popupHTML += '</div>';
             }
             
