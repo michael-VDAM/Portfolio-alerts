@@ -42,6 +42,23 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.3; }
         }
+        .sound-selector {
+            background: #f9f9f9;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+        .sound-selector label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .sound-selector select {
+            padding: 10px;
+            font-size: 1em;
+            border-radius: 5px;
+            border: 2px solid #ddd;
+            margin-right: 10px;
+        }
         button {
             padding: 15px 30px;
             font-size: 1.1em;
@@ -54,6 +71,7 @@
         .btn-start { background: #1e3c72; color: white; }
         .btn-stop { background: #888; color: white; }
         .btn-test { background: #ff4444; color: white; }
+        .btn-preview { background: #4caf50; color: white; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #1e3c72; color: white; }
@@ -68,6 +86,21 @@
             <span id="status">Ready</span> | 
             Assets: <span id="count">0</span> | 
             Alerts: <span id="alerts">0</span>
+        </div>
+        
+        <div class="sound-selector">
+            <label>Alarm Sound:</label>
+            <select id="soundSelect">
+                <option value="siren">🚨 Siren (Classic)</option>
+                <option value="urgent">⚠️ Urgent Alarm</option>
+                <option value="beep">📢 Beep Beep</option>
+                <option value="woop">🚓 Police Siren</option>
+                <option value="buzz">📳 Intense Buzz</option>
+                <option value="horn">📯 Air Horn</option>
+                <option value="rapid">⏰ Rapid Beeps</option>
+                <option value="warble">🔔 Warble</option>
+            </select>
+            <button class="btn-preview" id="previewBtn">Preview Sound</button>
         </div>
         
         <div style="text-align: center;">
@@ -104,12 +137,41 @@
         var audioContext = null;
         var mainOscillator = null;
         var mainGain = null;
+        var previewOscillator = null;
+        var previewGain = null;
+        
+        var SOUND_PATTERNS = {
+            siren: { freq1: 800, freq2: 1000, speed: 300, pattern: 'alternating' },
+            urgent: { freq1: 1000, freq2: 1400, speed: 150, pattern: 'alternating' },
+            beep: { freq1: 880, freq2: 880, speed: 200, pattern: 'pulse' },
+            woop: { freq1: 600, freq2: 800, speed: 250, pattern: 'alternating' },
+            buzz: { freq1: 200, freq2: 200, speed: 100, pattern: 'pulse' },
+            horn: { freq1: 440, freq2: 440, speed: 0, pattern: 'continuous' },
+            rapid: { freq1: 1200, freq2: 1200, speed: 100, pattern: 'pulse' },
+            warble: { freq1: 700, freq2: 900, speed: 400, pattern: 'alternating' }
+        };
+        
+        // Load saved sound preference
+        var savedSound = localStorage.getItem('alarmSound');
+        if (savedSound && SOUND_PATTERNS[savedSound]) {
+            document.getElementById('soundSelect').value = savedSound;
+        }
+        
+        // Save sound preference when changed
+        document.getElementById('soundSelect').onchange = function() {
+            localStorage.setItem('alarmSound', this.value);
+        };
         
         function initAudio() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
                 console.log('Audio initialized!');
             }
+        }
+        
+        function getSelectedSound() {
+            var soundType = document.getElementById('soundSelect').value;
+            return SOUND_PATTERNS[soundType];
         }
         
         function playAlarm() {
@@ -120,23 +182,35 @@
             
             stopAlarm();
             
+            var sound = getSelectedSound();
+            
             mainOscillator = audioContext.createOscillator();
             mainGain = audioContext.createGain();
             
             mainOscillator.connect(mainGain);
             mainGain.connect(audioContext.destination);
-            mainOscillator.frequency.value = 800;
+            mainOscillator.frequency.value = sound.freq1;
             mainOscillator.type = 'sine';
             mainGain.gain.value = 0.4;
             mainOscillator.start();
             
-            var toggle = true;
-            window.alarmInterval = setInterval(function() {
-                if (mainOscillator) {
-                    mainOscillator.frequency.value = toggle ? 800 : 1000;
-                    toggle = !toggle;
-                }
-            }, 300);
+            if (sound.pattern === 'alternating') {
+                var toggle = true;
+                window.alarmInterval = setInterval(function() {
+                    if (mainOscillator) {
+                        mainOscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
+                        toggle = !toggle;
+                    }
+                }, sound.speed);
+            } else if (sound.pattern === 'pulse') {
+                var on = true;
+                window.alarmInterval = setInterval(function() {
+                    if (mainGain) {
+                        mainGain.gain.value = on ? 0.4 : 0;
+                        on = !on;
+                    }
+                }, sound.speed);
+            }
             
             console.log('ALARM PLAYING!');
         }
@@ -154,6 +228,58 @@
             }
         }
         
+        function stopPreview() {
+            if (window.previewInterval) {
+                clearInterval(window.previewInterval);
+                window.previewInterval = null;
+            }
+            if (previewOscillator) {
+                try {
+                    previewOscillator.stop();
+                } catch (e) {}
+                previewOscillator = null;
+            }
+        }
+        
+        document.getElementById('previewBtn').onclick = function() {
+            initAudio();
+            stopPreview();
+            
+            var sound = getSelectedSound();
+            
+            previewOscillator = audioContext.createOscillator();
+            previewGain = audioContext.createGain();
+            
+            previewOscillator.connect(previewGain);
+            previewGain.connect(audioContext.destination);
+            previewOscillator.frequency.value = sound.freq1;
+            previewOscillator.type = 'sine';
+            previewGain.gain.value = 0.3;
+            previewOscillator.start();
+            
+            if (sound.pattern === 'alternating') {
+                var toggle = true;
+                window.previewInterval = setInterval(function() {
+                    if (previewOscillator) {
+                        previewOscillator.frequency.value = toggle ? sound.freq1 : sound.freq2;
+                        toggle = !toggle;
+                    }
+                }, sound.speed);
+            } else if (sound.pattern === 'pulse') {
+                var on = true;
+                window.previewInterval = setInterval(function() {
+                    if (previewGain) {
+                        previewGain.gain.value = on ? 0.3 : 0;
+                        on = !on;
+                    }
+                }, sound.speed);
+            }
+            
+            setTimeout(function() {
+                stopPreview();
+            }, 3000);
+        };
+        
         document.getElementById('startBtn').onclick = function() {
             console.log('Start clicked - initializing audio');
             initAudio();
@@ -167,6 +293,7 @@
             console.log('Stop clicked');
             if (interval) clearInterval(interval);
             stopAlarm();
+            stopPreview();
             document.getElementById('indicator').classList.remove('active');
             document.getElementById('status').textContent = 'Stopped';
         };
@@ -214,15 +341,12 @@
                     var high = parseFloat(highStr.replace(/[$,]/g, ''));
                     var low = parseFloat(lowStr.replace(/[$,]/g, ''));
                     
-                    console.log(asset + ': Current=' + current + ', High=' + high + ', Low=' + low);
-                    
                     var status = 'OK';
                     var alertKey = null;
                     
                     if (high > 0 && current >= high) {
                         status = 'HIGH ALERT';
                         alertKey = asset + '-HIGH';
-                        console.log('HIGH ALERT: ' + asset);
                         if (!dismissed[alertKey]) {
                             triggered.push({
                                 asset: asset,
@@ -234,7 +358,6 @@
                     } else if (low > 0 && current <= low) {
                         status = 'LOW ALERT';
                         alertKey = asset + '-LOW';
-                        console.log('LOW ALERT: ' + asset);
                         if (!dismissed[alertKey]) {
                             triggered.push({
                                 asset: asset,
@@ -282,6 +405,8 @@
                 return;
             }
             
+            var sound = getSelectedSound();
+            
             var popupHTML = '<!DOCTYPE html>';
             popupHTML += '<html><head><meta charset="UTF-8"><title>ALERT</title>';
             popupHTML += '<style>';
@@ -311,11 +436,18 @@
             popupHTML += 'var gain=ctx.createGain();';
             popupHTML += 'osc.connect(gain);';
             popupHTML += 'gain.connect(ctx.destination);';
-            popupHTML += 'osc.frequency.value=800;';
+            popupHTML += 'osc.frequency.value=' + sound.freq1 + ';';
             popupHTML += 'gain.gain.value=0.4;';
             popupHTML += 'osc.start();';
-            popupHTML += 'var t=true;';
-            popupHTML += 'setInterval(function(){osc.frequency.value=t?800:1000;t=!t},300);';
+            
+            if (sound.pattern === 'alternating') {
+                popupHTML += 'var t=true;';
+                popupHTML += 'setInterval(function(){osc.frequency.value=t?' + sound.freq1 + ':' + sound.freq2 + ';t=!t},' + sound.speed + ');';
+            } else if (sound.pattern === 'pulse') {
+                popupHTML += 'var on=true;';
+                popupHTML += 'setInterval(function(){gain.gain.value=on?0.4:0;on=!on},' + sound.speed + ');';
+            }
+            
             popupHTML += 'function dismissAlert(){';
             popupHTML += 'if(window.opener&&!window.opener.closed){';
             popupHTML += 'window.opener.postMessage("dismiss","*");';
