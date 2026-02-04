@@ -19,6 +19,13 @@
             margin: 0 auto;
         }
         h1 { text-align: center; margin-bottom: 20px; }
+        .warning {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
         .status {
             background: #f0f0f0;
             padding: 15px;
@@ -60,10 +67,6 @@
             margin-right: 10px;
             min-width: 250px;
         }
-        .sound-selector optgroup {
-            font-weight: bold;
-            font-style: normal;
-        }
         button {
             padding: 15px 30px;
             font-size: 1.1em;
@@ -81,22 +84,14 @@
         th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
         th { background: #1e3c72; color: white; }
         .price { font-family: 'Courier New', monospace; }
-        .debug-info {
-            background: #fff3cd;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 0.9em;
-            border-left: 4px solid #ffc107;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Portfolio Alert Monitor</h1>
         
-        <div class="debug-info">
-            <strong>🔍 Debug Mode:</strong> Check browser console (F12) to see full precision values from Coda
+        <div class="warning">
+            <strong>⚠️ LIMITATION:</strong> Coda's API returns prices with only 2 decimal precision. For assets like XLM at $0.17, we can only detect alerts when the price crosses $0.17 (not $0.174523). This is a Coda API limitation, not a bug in our code.
         </div>
         
         <div class="status">
@@ -140,7 +135,7 @@
             <thead>
                 <tr>
                     <th>Asset</th>
-                    <th>Current Price (Full Precision)</th>
+                    <th>Current Price (2 decimals from Coda)</th>
                     <th>Low Alert</th>
                     <th>High Alert</th>
                     <th>Status</th>
@@ -163,10 +158,8 @@
         var dismissed = {};
         var audioContext = null;
         var mainOscillator = null;
-        var mainOscillator2 = null;
         var mainGain = null;
         var previewOscillator = null;
-        var previewOscillator2 = null;
         var previewGain = null;
         
         var SOUND_PATTERNS = {
@@ -197,61 +190,19 @@
         function initAudio() {
             if (!audioContext) {
                 audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                console.log('Audio initialized!');
             }
         }
         
         function getSelectedSound() {
-            var soundType = document.getElementById('soundSelect').value;
-            return SOUND_PATTERNS[soundType];
-        }
-        
-        function extractNumber(value) {
-            // Handle different value types from Coda API
-            console.log('Raw value from Coda:', value, 'Type:', typeof value);
-            
-            if (typeof value === 'number') {
-                return value;
-            }
-            
-            if (typeof value === 'string') {
-                // Remove $, commas, and any other formatting
-                var cleaned = value.replace(/[$,\s]/g, '');
-                return parseFloat(cleaned) || 0;
-            }
-            
-            if (typeof value === 'object' && value !== null) {
-                // Coda might return an object with value property
-                if (value.value !== undefined) {
-                    return extractNumber(value.value);
-                }
-                if (value.amount !== undefined) {
-                    return extractNumber(value.amount);
-                }
-            }
-            
-            return 0;
+            return SOUND_PATTERNS[document.getElementById('soundSelect').value];
         }
         
         function formatPrice(price) {
-            // Show up to 8 decimals, remove trailing zeros
-            var formatted = price.toFixed(8);
-            formatted = formatted.replace(/\.?0+$/, '');
-            var parts = formatted.split('.');
-            if (parts.length === 1) {
-                formatted += '.00';
-            } else if (parts[1].length === 1) {
-                formatted += '0';
-            }
-            return '$' + formatted;
+            return '$' + price.toFixed(2);
         }
         
         function playAlarm() {
-            if (!audioContext) {
-                console.log('Audio not initialized');
-                return;
-            }
-            
+            if (!audioContext) return;
             stopAlarm();
             
             var sound = getSelectedSound();
@@ -259,7 +210,6 @@
             if (sound.type === 'urgent') {
                 mainOscillator = audioContext.createOscillator();
                 mainGain = audioContext.createGain();
-                
                 mainOscillator.connect(mainGain);
                 mainGain.connect(audioContext.destination);
                 mainOscillator.frequency.value = sound.freq1;
@@ -299,7 +249,6 @@
                         oscillators.push(osc);
                     }
                     window.alarmOscillators = oscillators;
-                    
                     window.alarmInterval = setInterval(function() {
                         if (window.alarmOscillators) {
                             for (var j = 0; j < window.alarmOscillators.length; j++) {
@@ -322,12 +271,10 @@
                     }, 2000);
                 } else if (sound.pattern === 'sequence') {
                     var noteIndex = 0;
-                    
                     function playNextNote() {
                         if (mainOscillator) {
                             try { mainOscillator.stop(); } catch(e) {}
                         }
-                        
                         mainOscillator = audioContext.createOscillator();
                         mainGain = audioContext.createGain();
                         mainOscillator.connect(mainGain);
@@ -336,16 +283,12 @@
                         mainOscillator.type = 'sine';
                         mainGain.gain.value = 0.3;
                         mainOscillator.start();
-                        
                         noteIndex = (noteIndex + 1) % sound.notes.length;
                     }
-                    
                     playNextNote();
                     window.alarmInterval = setInterval(playNextNote, sound.speed);
                 }
             }
-            
-            console.log('ALARM PLAYING!');
         }
         
         function stopAlarm() {
@@ -356,10 +299,6 @@
             if (mainOscillator) {
                 try { mainOscillator.stop(); } catch (e) {}
                 mainOscillator = null;
-            }
-            if (mainOscillator2) {
-                try { mainOscillator2.stop(); } catch (e) {}
-                mainOscillator2 = null;
             }
             if (window.alarmOscillators) {
                 for (var i = 0; i < window.alarmOscillators.length; i++) {
@@ -378,10 +317,6 @@
                 try { previewOscillator.stop(); } catch (e) {}
                 previewOscillator = null;
             }
-            if (previewOscillator2) {
-                try { previewOscillator2.stop(); } catch (e) {}
-                previewOscillator2 = null;
-            }
             if (window.previewOscillators) {
                 for (var i = 0; i < window.previewOscillators.length; i++) {
                     try { window.previewOscillators[i].stop(); } catch(e) {}
@@ -393,13 +328,11 @@
         document.getElementById('previewBtn').onclick = function() {
             initAudio();
             stopPreview();
-            
             var sound = getSelectedSound();
             
             if (sound.type === 'urgent') {
                 previewOscillator = audioContext.createOscillator();
                 previewGain = audioContext.createGain();
-                
                 previewOscillator.connect(previewGain);
                 previewGain.connect(audioContext.destination);
                 previewOscillator.frequency.value = sound.freq1;
@@ -424,7 +357,7 @@
                         }
                     }, sound.speed);
                 }
-            } else if (sound.pattern === 'pleasant') {
+            } else if (sound.type === 'pleasant') {
                 if (sound.pattern === 'chord') {
                     var oscillators = [];
                     for (var i = 0; i < sound.notes.length; i++) {
@@ -441,12 +374,10 @@
                     window.previewOscillators = oscillators;
                 } else if (sound.pattern === 'sequence') {
                     var noteIndex = 0;
-                    
                     function playPreviewNote() {
                         if (previewOscillator) {
                             try { previewOscillator.stop(); } catch(e) {}
                         }
-                        
                         previewOscillator = audioContext.createOscillator();
                         previewGain = audioContext.createGain();
                         previewOscillator.connect(previewGain);
@@ -455,22 +386,16 @@
                         previewOscillator.type = 'sine';
                         previewGain.gain.value = 0.2;
                         previewOscillator.start();
-                        
                         noteIndex = (noteIndex + 1) % sound.notes.length;
                     }
-                    
                     playPreviewNote();
                     window.previewInterval = setInterval(playPreviewNote, sound.speed);
                 }
             }
-            
-            setTimeout(function() {
-                stopPreview();
-            }, 3000);
+            setTimeout(function() { stopPreview(); }, 3000);
         };
         
         document.getElementById('startBtn').onclick = function() {
-            console.log('Start clicked - initializing audio');
             initAudio();
             document.getElementById('indicator').classList.add('active');
             document.getElementById('status').textContent = 'Monitoring... (Audio Ready)';
@@ -479,7 +404,6 @@
         };
         
         function stopMonitoring() {
-            console.log('Stopping monitoring');
             if (interval) {
                 clearInterval(interval);
                 interval = null;
@@ -496,21 +420,18 @@
         };
         
         document.getElementById('testBtn').onclick = function() {
-            console.log('Test clicked');
             initAudio();
             playAlarm();
             openAlertWindow([{
                 asset: 'Test Bitcoin',
-                currentPrice: 96500.123456,
-                threshold: 95000,
+                currentPrice: 96500.00,
+                threshold: 95000.00,
                 type: 'HIGH'
             }]);
         };
         
         function checkPrices() {
-            console.log('=== CHECKING PRICES ===');
-            console.log('Fetching WITHOUT useColumnNames to get raw values...');
-            var url = 'https://coda.io/apis/v1/docs/' + DOC_ID + '/tables/' + encodeURIComponent(TABLE_NAME) + '/rows?valueFormat=simple';
+            var url = 'https://coda.io/apis/v1/docs/' + DOC_ID + '/tables/' + encodeURIComponent(TABLE_NAME) + '/rows?useColumnNames=true';
             
             fetch(url, {
                 headers: { 'Authorization': 'Bearer ' + API_TOKEN }
@@ -523,54 +444,26 @@
             })
             .then(function(data) {
                 var rows = data.items || [];
-                console.log('Got ' + rows.length + ' rows');
-                console.log('Sample row structure:', rows[0]);
                 
                 var triggered = [];
                 var html = '';
                 
                 for (var i = 0; i < rows.length; i++) {
-                    var row = rows[i];
-                    var values = row.values || {};
+                    var values = rows[i].values;
+                    var asset = values['Asset Name (ticker)'] || 'Unknown';
+                    var currentStr = String(values['Current Price'] || '0');
+                    var highStr = String(values[HIGH_ALERT_COL] || '0');
+                    var lowStr = String(values[LOW_ALERT_COL] || '0');
                     
-                    // Get asset name
-                    var asset = '';
-                    for (var key in values) {
-                        if (key.toLowerCase().includes('asset') && key.toLowerCase().includes('name')) {
-                            asset = values[key];
-                            break;
-                        }
-                    }
-                    if (!asset) asset = 'Unknown';
-                    
-                    // Find Current Price, High Alert, Low Alert columns
-                    var current = 0;
-                    var high = 0;
-                    var low = 0;
-                    
-                    for (var colKey in values) {
-                        var val = values[colKey];
-                        console.log(asset + ' - Column:', colKey, '=', val, '(type:', typeof val, ')');
-                        
-                        if (colKey.toLowerCase().includes('current') && colKey.toLowerCase().includes('price')) {
-                            current = extractNumber(val);
-                        } else if (colKey.includes('\uD83D\uDEA8') || (colKey.toLowerCase().includes('high') && colKey.toLowerCase().includes('alert'))) {
-                            high = extractNumber(val);
-                        } else if (colKey.includes('\u26A0') || (colKey.toLowerCase().includes('low') && colKey.toLowerCase().includes('alert'))) {
-                            low = extractNumber(val);
-                        }
-                    }
-                    
-                    console.log('==> ' + asset + ': Current=' + current + ', High=' + high + ', Low=' + low);
+                    var current = parseFloat(currentStr.replace(/[$,]/g, ''));
+                    var high = parseFloat(highStr.replace(/[$,]/g, ''));
+                    var low = parseFloat(lowStr.replace(/[$,]/g, ''));
                     
                     var status = 'OK';
-                    var alertKey = null;
                     
                     if (high > 0 && current >= high) {
                         status = 'HIGH ALERT';
-                        alertKey = asset + '-HIGH';
-                        console.log('!!! HIGH ALERT FOR ' + asset + ': ' + current + ' >= ' + high);
-                        if (!dismissed[alertKey]) {
+                        if (!dismissed[asset + '-HIGH']) {
                             triggered.push({
                                 asset: asset,
                                 currentPrice: current,
@@ -580,9 +473,7 @@
                         }
                     } else if (low > 0 && current <= low) {
                         status = 'LOW ALERT';
-                        alertKey = asset + '-LOW';
-                        console.log('!!! LOW ALERT FOR ' + asset + ': ' + current + ' <= ' + low);
-                        if (!dismissed[alertKey]) {
+                        if (!dismissed[asset + '-LOW']) {
                             triggered.push({
                                 asset: asset,
                                 currentPrice: current,
@@ -611,7 +502,6 @@
                 document.getElementById('lastCheck').textContent = 'Last checked: ' + new Date().toLocaleTimeString();
                 
                 if (triggered.length > 0) {
-                    console.log('🚨🚨🚨 ' + triggered.length + ' alerts triggered - PLAYING ALARM');
                     playAlarm();
                     openAlertWindow(triggered);
                 }
@@ -722,7 +612,6 @@
         
         window.addEventListener('message', function(event) {
             if (event.data === 'dismiss') {
-                console.log('Dismiss received - stopping monitoring completely');
                 stopMonitoring();
             }
         });
