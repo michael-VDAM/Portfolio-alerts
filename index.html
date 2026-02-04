@@ -435,13 +435,21 @@
             interval = setInterval(checkPrices, 30000);
         };
         
-        document.getElementById('stopBtn').onclick = function() {
-            console.log('Stop clicked');
-            if (interval) clearInterval(interval);
+        function stopMonitoring() {
+            console.log('Stopping monitoring');
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
             stopAlarm();
             stopPreview();
+            dismissed = {};
             document.getElementById('indicator').classList.remove('active');
             document.getElementById('status').textContent = 'Stopped';
+        }
+        
+        document.getElementById('stopBtn').onclick = function() {
+            stopMonitoring();
         };
         
         document.getElementById('testBtn').onclick = function() {
@@ -575,7 +583,7 @@
                 popupHTML += '</div>';
             }
             
-            popupHTML += '<button onclick="dismissAlert()">DISMISS</button></div>';
+            popupHTML += '<button onclick="dismissAlert()">DISMISS & STOP MONITORING</button></div>';
             popupHTML += '<script>';
             popupHTML += 'var ctx=new (window.AudioContext||window.webkitAudioContext)();';
             
@@ -643,7 +651,8 @@
         
         window.addEventListener('message', function(event) {
             if (event.data === 'dismiss') {
-                stopAlarm();
+                console.log('Dismiss received - stopping monitoring completely');
+                stopMonitoring();
             }
         });
     </script>
